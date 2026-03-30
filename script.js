@@ -487,4 +487,12 @@ function closeModal() { document.getElementById('estimateModal').style.display =
 function downloadPDF() { const el = document.getElementById('printableEstimate'); html2pdf().from(el).save(`Neel_Studio_Bill.pdf`); }
 function shareWA() { window.open(`https://wa.me/?text=Estimate from Neel Studio`, '_blank'); }
 
-window.onload = () => { updateDashboardStats(); renderDashboard(); renderPackageChips(); };
+window.onload = () => { 
+    updateDashboardStats(); 
+    renderDashboard(); 
+    renderPackageChips(); 
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js');
+    }
+};
