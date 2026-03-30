@@ -71,12 +71,36 @@ function uploadPortfolio(input) {
     if (portfolioImages.length + files.length > 15) return alert("Maximum 15 photos allowed in portfolio.");
 
     files.forEach(file => {
-        if (file.size > 500000) return alert(`File ${file.name} is too large (Max 500KB).`);
+        if (file.size > 20000000) return alert(`File ${file.name} is too large (Max 20MB).`);
+        
         const reader = new FileReader();
         reader.onload = (e) => {
-            portfolioImages.push(e.target.result);
-            localStorage.setItem('portfolioImages', JSON.stringify(portfolioImages));
-            renderPortfolioGrid();
+            const img = new Image();
+            img.onload = () => {
+                // Optimization: Resize high-res images to manageable size for storage/PDF
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxDim = 1200; // Good balance for PDF quality and storage
+
+                if (width > height) {
+                    if (width > maxDim) { height *= maxDim / width; width = maxDim; }
+                } else {
+                    if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Store as medium-quality JPEG to save space
+                const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                portfolioImages.push(optimizedDataUrl);
+                localStorage.setItem('portfolioImages', JSON.stringify(portfolioImages));
+                renderPortfolioGrid();
+            };
+            img.src = e.target.result;
         };
         reader.readAsDataURL(file);
     });
