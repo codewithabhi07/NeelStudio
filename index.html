@@ -6,17 +6,31 @@
     <title>Neel Studio | Pro Management Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#d4af37">
+    <meta name="theme-color" content="#E91E63">
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- PDF Lib -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3249/3249935.png">
 </head>
 <body class="pro-dashboard">
-    <!-- Sidebar Navigation -->
-    <nav class="sidebar no-print">
+    <!-- Mobile Header -->
+    <header class="mobile-header no-print">
         <div class="sidebar-brand">
+            <i class="fas fa-camera-retro"></i>
+            <span>Neel Studio</span>
+        </div>
+        <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <nav id="mainSidebar" class="sidebar no-print">
+        <div class="sidebar-brand hide-mobile">
             <i class="fas fa-camera-retro"></i>
             <span>Neel Studio</span>
         </div>
@@ -29,393 +43,305 @@
             <li onclick="switchTab('settings')"><i class="fas fa-cog"></i> Settings</li>
         </ul>
         <div class="sidebar-footer">
-            <p>&copy; 2026 Neel Studio</p>
+            <p>&copy; 2026 Neel Studio<br>v2.0 Aurora</p>
         </div>
     </nav>
 
     <!-- Main Content Area -->
     <main class="main-content">
+        <button class="fab-mobile no-print" onclick="switchTab('estimate')"><i class="fas fa-plus"></i></button>
         <!-- Tab: Dashboard -->
         <div id="tab-dashboard" class="tab-pane active">
             <header class="tab-header">
                 <h1>Business Overview</h1>
                 <p id="todayDate"></p>
             </header>
+            
             <div class="stats-grid">
-                <div class="stat-card">
-                    <i class="fas fa-calendar-check gold"></i>
-                    <div>
-                        <h3 id="stat-bookings">0</h3>
-                        <p>Total Bookings</p>
-                    </div>
+                <div class="stat-card c1">
+                    <i class="fas fa-calendar-check"></i>
+                    <div><h3 id="stat-bookings">0</h3><p>Total Bookings</p></div>
                 </div>
-                <div class="stat-card">
-                    <i class="fas fa-money-bill-wave gold"></i>
-                    <div>
-                        <h3 id="stat-revenue">₹0</h3>
-                        <p>Total Revenue</p>
-                    </div>
+                <div class="stat-card c2">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <div><h3 id="stat-revenue">₹0</h3><p>Total Revenue</p></div>
                 </div>
-                <div class="stat-card">
-                    <i class="fas fa-hand-holding-usd gold"></i>
-                    <div>
-                        <h3 id="stat-profit">₹0</h3>
-                        <p>Est. Profit</p>
-                    </div>
+                <div class="stat-card c3">
+                    <i class="fas fa-hand-holding-usd"></i>
+                    <div><h3 id="stat-profit">₹0</h3><p>Est. Profit</p></div>
                 </div>
-                <div class="stat-card">
-                    <i class="fas fa-hourglass-half gold"></i>
-                    <div>
-                        <h3 id="stat-pending">₹0</h3>
-                        <p>Pending Balance</p>
-                    </div>
+                <div class="stat-card c4">
+                    <i class="fas fa-hourglass-half"></i>
+                    <div><h3 id="stat-pending">₹0</h3><p>Pending Balance</p></div>
                 </div>
             </div>
 
-            <div class="dashboard-flex" style="display: grid; grid-template-columns: 2fr 1fr; gap: 25px;">
-                <section class="upcoming-events-card card">
-                    <h2>Upcoming This Month</h2>
-                    <div id="dashboard-upcoming-list">
-                        <!-- Dynamic -->
-                    </div>
+            <div class="card">
+                <h2><i class="fas fa-chart-bar"></i> Financial Performance</h2>
+                <div style="height: 300px; position: relative;">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+
+            <div class="dashboard-flex">
+                <section class="card">
+                    <h2><i class="fas fa-clock"></i> Upcoming This Month</h2>
+                    <div id="dashboard-upcoming-list"></div>
                 </section>
 
                 <section class="card">
-                    <h2 class="sub-title">Quick Expense</h2>
-                    <div class="input-group" style="margin-bottom: 15px;">
+                    <h2><i class="fas fa-wallet"></i> Quick Expense</h2>
+                    <div class="form-group">
                         <input type="text" id="exp-desc" placeholder="e.g. Helper Boy">
                     </div>
-                    <div class="input-group" style="margin-bottom: 15px;">
+                    <div class="form-group">
                         <input type="number" id="exp-amount" placeholder="Amount ₹">
                     </div>
-                    <button class="btn-primary" style="width: 100%;" onclick="addExpense()">Add Expense</button>
-                    
-                    <div id="mini-expense-list" style="margin-top: 20px; font-size: 0.85rem;">
-                        <!-- Dynamic -->
-                    </div>
+                    <button class="btn-primary" style="width: 100%" onclick="addExpense()">Add Expense</button>
+                    <div id="mini-expense-list" style="margin-top:20px;"></div>
                 </section>
             </div>
         </div>
 
-        <!-- Tab: Create Estimate -->
-        <div id="tab-estimate" class="tab-pane">
-            <header class="tab-header">
-                <h1>New Estimate</h1>
-            </header>
-            <div class="estimate-flex">
-                <!-- Step 1: Client Info -->
-                <section class="card glass-form">
-                    <h2 class="sub-title"><i class="fas fa-user"></i> Client Info</h2>
-                    <div class="form-grid">
-                        <div class="input-group">
-                            <label>Client Name</label>
-                            <input type="text" id="clientName" placeholder="Full Name">
+        <!-- Tab: New Estimate -->
+        <div id="tab-estimate" class="tab-pane" style="display:none">
+            <header class="tab-header"><h1>New Estimate</h1><p>Create a professional bill for your client</p></header>
+            <div class="estimate-flex-grid" style="display:grid; grid-template-columns: 2fr 1.2fr; gap:30px;">
+                <div class="left-col">
+                    <section class="card">
+                        <h2><i class="fas fa-user-circle"></i> Client Information</h2>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                            <div class="form-group"><label>Client Name</label><input type="text" id="clientName" placeholder="Full Name"></div>
+                            <div class="form-group"><label>WhatsApp Number</label><input type="text" id="clientPhone" placeholder="+91"></div>
+                            <div class="form-group"><label>Event Date</label><input type="date" id="eventDate"></div>
+                            <div class="form-group"><label>Location</label><input type="text" id="location" placeholder="Venue/City"></div>
+                            <div class="form-group"><label>Category</label>
+                                <select id="eventCategory">
+                                    <option value="Wedding">Wedding</option>
+                                    <option value="Pre-Wedding">Pre-Wedding</option>
+                                    <option value="Maternity">Maternity</option>
+                                    <option value="Baby Shower">Baby Shower</option>
+                                    <option value="Corporate">Corporate</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label>Session</label><select id="eventSession"><option value="Morning">Morning</option><option value="Evening">Evening</option><option value="Full Day">Full Day</option></select></div>
                         </div>
-                        <div class="input-group">
-                            <label>Phone Number</label>
-                            <input type="text" id="clientPhone" placeholder="+91 ...">
+                    </section>
+                    <section class="card">
+                        <h2><i class="fas fa-layer-group"></i> Select Package</h2>
+                        <div class="package-chips" id="package-chips" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom: 20px;"></div>
+                        <div class="form-group">
+                            <label>Internal Notes (Private)</label>
+                            <textarea id="estimateNotes" rows="3" placeholder="Staff requirements, special requests..."></textarea>
                         </div>
-                        <div class="input-group">
-                            <label>Event Start Date</label>
-                            <input type="date" id="eventDate" onchange="checkAvailability()">
-                            <span id="avail-badge" class="badge">Check Availability</span>
-                        </div>
-                        <div class="input-group">
-                            <label>Event End Date (Optional)</label>
-                            <input type="date" id="eventEndDate">
-                        </div>
-                        <div class="input-group">
-                            <label>Location</label>
-                            <input type="text" id="location" placeholder="Venue/City">
-                        </div>
-                        <div class="input-group">
-                            <label>Event Category</label>
-                            <select id="eventCategory" style="width: 100%; padding: 12px; background: #222; color: white; border-radius: 8px; border: 1px solid #444;">
-                                <option value="Wedding">Wedding</option>
-                                <option value="Maternity">Maternity</option>
-                                <option value="Baby Shower">Baby Shower</option>
-                                <option value="Pre-Wedding">Pre-Wedding</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label>Assign Staff</label>
-                            <input type="text" id="assignStaff" placeholder="Lead Photographer Name">
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Step 2: Package Selection -->
-                <section class="packages-section">
-                    <h2 class="sub-title"><i class="fas fa-box-open"></i> Choose Package</h2>
-                    <div class="package-chips">
-                        <!-- Dynamic -->
-                    </div>
-                </section>
-
-                <!-- Step 3: Add-ons -->
-                <section class="card glass-form">
-                    <h2 class="sub-title"><i class="fas fa-plus-circle"></i> Add-ons</h2>
-                    <div class="addon-grid-lite">
-                        <label><input type="checkbox" value="15000" onchange="updateTotal()" data-name="Drone Shot"> Drone Coverage (₹15k)</label>
-                        <label><input type="checkbox" value="10000" onchange="updateTotal()" data-name="Premium Album"> Premium Album (₹10k)</label>
-                        <label><input type="checkbox" value="12000" onchange="updateTotal()" data-name="Extra Photographer"> Extra Photographer (₹12k)</label>
-                        <label><input type="checkbox" value="20000" onchange="updateTotal()" data-name="Same Day Edit"> Same Day Edit (₹20k)</label>
-                    </div>
-                </section>
-
-                <!-- Step 4: Payments -->
-                <section class="card glass-form">
-                    <h2 class="sub-title"><i class="fas fa-receipt"></i> Payment Details</h2>
-                    <div class="form-grid">
-                        <div class="input-group">
-                            <label>Discount (₹)</label>
-                            <input type="number" id="discountInput" value="0" oninput="updateTotal()">
-                        </div>
-                        <div class="input-group">
-                            <label>Advance Received (₹)</label>
-                            <input type="number" id="advanceInput" value="0" oninput="updateTotal()">
-                        </div>
-                    </div>
-                </section>
-
-                <div class="floating-summary">
-                    <div class="summary-text">
-                        <p>Total: <strong id="totalDisplay">₹0</strong></p>
-                        <p>Balance: <strong class="gold" id="balanceDisplay">₹0</strong></p>
-                    </div>
-                    <button class="btn-primary" onclick="generateEstimate()"><i class="fas fa-file-invoice"></i> Create Bill</button>
+                    </section>
                 </div>
-            </div>
-        </div>
-
-        <!-- Tab: Calendar -->
-        <div id="tab-calendar" class="tab-pane">
-            <header class="tab-header">
-                <h1>Booking Calendar</h1>
-                <p>Click any date to Quick-Add an event!</p>
-            </header>
-            <div class="card calendar-card">
-                <div class="cal-nav">
-                    <button onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
-                    <h2 id="calMonthYear"></h2>
-                    <button onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+                <div class="right-col">
+                    <section class="card">
+                        <h2><i class="fas fa-plus-circle"></i> Additional Charges</h2>
+                        <div class="form-group">
+                            <label>Travel/Conveyance (₹)</label>
+                            <input type="number" id="travelCharge" value="0" oninput="updateTotal()">
+                        </div>
+                        <div class="form-group">
+                            <label>Other Expenses (₹)</label>
+                            <input type="number" id="otherCharge" value="0" oninput="updateTotal()">
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:12px; margin-top: 15px;">
+                            <label><input type="checkbox" class="addon-check" value="15000" data-name="Drone" onchange="updateTotal()"> Drone Coverage (₹15k)</label>
+                            <label><input type="checkbox" class="addon-check" value="10000" data-name="Album" onchange="updateTotal()"> Premium Album (₹10k)</label>
+                        </div>
+                    </section>
+                    <section class="card">
+                        <h2><i class="fas fa-receipt"></i> Payments</h2>
+                        <div class="form-group"><label>Discount (₹)</label><input type="number" id="discountInput" value="0" oninput="updateTotal()"></div>
+                        <div class="form-group"><label>Advance (₹)</label><input type="number" id="advanceInput" value="0" oninput="updateTotal()"></div>
+                        <div style="margin-top:20px; padding:20px; background:var(--aurora-gradient); border-radius:20px;">
+                            <p style="font-size:0.9rem; opacity:0.9">Final Total</p>
+                            <h2 id="totalDisplay" style="color:white; font-size:2rem; margin:5px 0;">₹0</h2>
+                            <p style="font-size:0.9rem; opacity:0.9">Remaining Balance</p>
+                            <h3 id="balanceDisplay" style="color:white; opacity:1">₹0</h3>
+                        </div>
+                        <button class="btn-primary" style="width:100%; margin-top:20px; background:white; color:var(--primary-pink)" onclick="showPreview()">Preview & Save</button>
+                    </section>
                 </div>
-                <div class="cal-grid" id="calendarGrid"></div>
             </div>
         </div>
 
         <!-- Tab: History -->
-        <div id="tab-history" class="tab-pane">
-            <header class="tab-header">
-                <h1>Estimate History</h1>
-                <input type="text" id="historySearch" placeholder="Search client name..." oninput="renderHistory()">
-            </header>
-            <div class="history-table-container">
-                <table class="history-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Client</th>
-                            <th>Package</th>
-                            <th>Total</th>
-                            <th>Balance</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="historyList">
-                        <!-- Dynamic -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Tab: Clients -->
-        <div id="tab-clients" class="tab-pane">
-            <header class="tab-header">
-                <h1>Client Database</h1>
-                <p>Manage your client relationships</p>
-            </header>
+        <div id="tab-history" class="tab-pane" style="display:none">
+            <header class="tab-header"><h1>Estimate History</h1><p>View and manage all past estimates</p></header>
             <div class="card">
-                <div class="history-table-container">
+                <input type="text" id="historySearch" placeholder="Search by client name..." oninput="renderHistory()" style="margin-bottom:20px;">
+                <div style="overflow-x:auto;">
                     <table class="history-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Phone</th>
-                                <th>Address</th>
-                                <th>Last Booking</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="clientsList">
-                            <!-- Dynamic -->
-                        </tbody>
+                        <thead><tr><th>Date</th><th>Client</th><th>Package</th><th>Total</th><th>Balance</th><th>Actions</th></tr></thead>
+                        <tbody id="historyList"></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- Tab: Settings -->
-        <div id="tab-settings" class="tab-pane">
-            <header class="tab-header">
-                <h1>Studio Settings</h1>
-                <p>Customize your dashboard and backup data</p>
-            </header>
+        <!-- Tab: Calendar -->
+        <div id="tab-calendar" class="tab-pane" style="display:none">
+            <header class="tab-header"><h1>Booking Calendar</h1><p>Track your schedule at a glance</p></header>
+            <div class="card" id="calendar-container"></div>
             
-            <div class="settings-grid">
-                <!-- Branding -->
-                <section class="card">
-                    <h2 class="sub-title"><i class="fas fa-id-card"></i> Studio Branding</h2>
-                    <div class="form-grid" style="grid-template-columns: 1fr;">
-                        <div class="input-group">
-                            <label>Studio Name</label>
-                            <input type="text" id="set-studioName" onchange="updateSettings()">
-                        </div>
-                        <div class="input-group">
-                            <label>Sub-heading</label>
-                            <input type="text" id="set-studioSub" onchange="updateSettings()">
-                        </div>
-                        <div class="input-group">
-                            <label>Logo (Upload Image)</label>
-                            <input type="file" id="logoUpload" accept="image/*" onchange="handleLogoUpload(this)">
-                            <div id="logoPreview" style="margin-top: 10px; max-width: 100px;"></div>
-                        </div>
-                    </div>
-                </section>
+            <div class="card">
+                <h2><i class="fas fa-list"></i> Monthly Schedule</h2>
+                <div style="overflow-x:auto;">
+                    <table class="history-table">
+                        <thead><tr><th>Date</th><th>Description</th><th>Client</th><th>Session</th><th>Status</th></tr></thead>
+                        <tbody id="manualEventsList"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
-                <!-- Packages -->
-                <section class="card">
-                    <h2 class="sub-title"><i class="fas fa-tags"></i> Manage Packages</h2>
-                    <div id="packageEditorList">
-                        <!-- Dynamic -->
-                    </div>
-                    <button class="btn-primary" style="margin-top: 20px; width: 100%;" onclick="savePackages()"><i class="fas fa-save"></i> Save Packages</button>
-                </section>
+        <!-- Tab: Clients -->
+        <div id="tab-clients" class="tab-pane" style="display:none">
+            <header class="tab-header"><h1>Client Database</h1><p>Your directory of professional contacts</p></header>
+            <div class="card" style="overflow-x:auto;">
+                <table class="history-table">
+                    <thead><tr><th>Name</th><th>Phone</th><th>Actions</th></tr></thead>
+                    <tbody id="clientsList"></tbody>
+                </table>
+            </div>
+        </div>
 
-                <!-- Data Safety -->
-                <section class="card">
-                    <h2 class="sub-title"><i class="fas fa-shield-alt"></i> Data Safety & Backup</h2>
-                    <div class="action-row" style="background: none; padding: 0; flex-direction: column; gap: 10px;">
-                        <button class="btn-pdf" style="width: 100%;" onclick="exportData()"><i class="fas fa-download"></i> Download Backup (JSON)</button>
-                        <div style="width: 100%;">
-                            <label class="btn-wa" style="display: block; text-align: center; cursor: pointer; background: #555;">
-                                <i class="fas fa-upload"></i> Restore from Backup
-                                <input type="file" id="importFile" style="display: none;" onchange="importData(this)">
-                            </label>
+        <!-- Tab: Settings -->
+        <div id="tab-settings" class="tab-pane" style="display:none">
+            <header class="tab-header"><h1>System Settings</h1><p>Customize your experience</p></header>
+            <div class="dashboard-flex">
+                <div class="left-col">
+                    <section class="card">
+                        <h2><i class="fas fa-store"></i> Studio Branding</h2>
+                        <div class="form-group"><label>Studio Name</label><input type="text" id="set-studioName" onchange="saveSettings()"></div>
+                        <div class="form-group"><label>Phone Number</label><input type="text" id="set-studioPhone" onchange="saveSettings()"></div>
+                        <div class="form-group"><label>Studio Address</label><textarea id="set-studioAddress" onchange="saveSettings()"></textarea></div>
+                    </section>
+                    <section class="card">
+                        <h2><i class="fas fa-file-contract"></i> Default Terms</h2>
+                        <textarea id="set-defaultTerms" rows="6" onchange="saveSettings()" placeholder="Enter your terms and conditions..."></textarea>
+                    </section>
+                </div>
+                <div class="right-col" style="display:flex; flex-direction:column; gap:30px;">
+                    <section class="card">
+                        <h2><i class="fas fa-images"></i> Studio Portfolio</h2>
+                        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:15px;">Upload up to 15 of your best shots to include in estimates. (Max 500KB each)</p>
+                        <div id="portfolio-grid" style="display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; margin-bottom:15px;"></div>
+                        <label class="btn-primary" style="display:block; text-align:center; cursor:pointer; background:rgba(255,255,255,0.05); color:white; border:1px solid var(--glass);">
+                            <i class="fas fa-plus-circle"></i> Add Photos
+                            <input type="file" id="portfolioInput" style="display:none" multiple accept="image/*" onchange="uploadPortfolio(this)">
+                        </label>
+                    </section>
+                    <section class="card">
+                        <h2><i class="fas fa-box-open"></i> Manage Packages</h2>
+                        <div id="settings-package-list" style="margin-bottom:20px; display:flex; flex-direction:column; gap:10px;"></div>
+                        <div style="border-top: 1px solid var(--glass); padding-top:20px;">
+                            <h4 style="margin-bottom:15px; color:var(--text-muted);">Add New Package</h4>
+                            <div class="form-group"><input type="text" id="newPkgName" placeholder="Package Name"></div>
+                            <div class="form-group"><input type="number" id="newPkgPrice" placeholder="Price ₹"></div>
+                            <button class="btn-primary" style="width:100%" onclick="addPackage()">Add Package</button>
                         </div>
-                        <p style="color: var(--text-muted); font-size: 0.8rem; text-align: center;">Note: Restoring will overwrite all current data.</p>
-                    </div>
-                </section>
+                    </section>
+                    <section class="card">
+                        <h2><i class="fas fa-database"></i> Data Management</h2>
+                        <button class="btn-primary" style="width:100%; margin-bottom:15px;" onclick="exportData()"><i class="fas fa-download"></i> Download Backup</button>
+                        <label class="btn-primary" style="display:block; text-align:center; cursor:pointer; background:rgba(255,255,255,0.05); color:white; border:1px solid var(--glass);">
+                            <i class="fas fa-upload"></i> Restore from File
+                            <input type="file" style="display:none" onchange="importData(this)">
+                        </label>
+                    </section>
+                </div>
             </div>
         </div>
     </main>
 
-    <!-- Modal for Estimate Preview -->
-    <div id="estimateModal" class="modal-overlay no-print">
-        <div class="modal-content">
-            <div id="printableEstimate" class="estimate-paper">
-                <div class="paper-header">
-                    <div class="studio-branding">
-                        <i class="fas fa-camera-retro"></i>
-                        <h2>Neel Studio</h2>
-                        <p>Cinematic Wedding Films & Photography</p>
-                    </div>
-                    <div class="bill-title">
-                        <h2>ESTIMATE</h2>
-                        <p id="billNumber"></p>
-                    </div>
+    <!-- Modal for Calendar Event -->
+    <div id="calendarModal" class="modal-overlay" style="display:none">
+        <div class="modal-content" style="max-width: 500px; background: var(--card-bg); color: white;">
+            <div style="padding: 30px;">
+                <h2 id="calModalTitle" style="color: var(--secondary-cyan); margin-bottom: 20px;">Add Event</h2>
+                <div class="form-group">
+                    <label>Event Title</label>
+                    <input type="text" id="calEventTitle" placeholder="e.g. Wedding Shoot">
                 </div>
-
-                <div class="bill-info-row">
-                    <div>
-                        <p><strong>Bill To:</strong></p>
-                        <p id="printClientName"></p>
-                        <p id="printLocation"></p>
-                    </div>
-                    <div class="text-right">
-                        <p><strong>Event Date:</strong> <span id="printDate"></span></p>
-                        <p><strong>Issue Date:</strong> <span id="issueDate"></span></p>
-                    </div>
-                </div>
-
-                <table class="bill-items">
-                    <thead>
-                        <tr>
-                            <th>Description</th>
-                            <th class="text-right">Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody id="printItemsList"></tbody>
-                    <tfoot>
-                        <tr><td>Subtotal</td><td class="text-right" id="printSubtotal"></td></tr>
-                        <tr><td>Discount</td><td class="text-right" id="printDiscount"></td></tr>
-                        <tr class="total-row"><td>Grand Total</td><td class="text-right" id="printGrandTotal"></td></tr>
-                        <tr><td>Advance Paid</td><td class="text-right" id="printAdvance"></td></tr>
-                        <tr class="balance-row"><td>Remaining Balance</td><td class="text-right gold" id="printBalance"></td></tr>
-                    </tfoot>
-                </table>
-
-                <div class="paper-footer">
-                    <p><strong>Payment Terms:</strong> 30% advance is non-refundable. Balance payment due on wedding day. Deliverables will be provided within 45 days of final payment.</p>
-                    <p class="center italic">Thank you for making Neel Studio a part of your story!</p>
-                </div>
-            </div>
-
-            <div class="action-row no-print">
-                <button class="btn-save-book" onclick="confirmBooking()"><i class="fas fa-calendar-plus"></i> Save & Book Date</button>
-                <button class="btn-pdf" onclick="downloadPDF()"><i class="fas fa-file-pdf"></i> Download</button>
-                <button class="btn-wa" onclick="shareWA()"><i class="fab fa-whatsapp"></i> WhatsApp</button>
-                <button class="btn-close" onclick="closeModal()">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Add Event Modal -->
-    <div id="quickAddModal" class="modal-overlay">
-        <div class="modal-content glass-form" style="max-width: 400px; color: white; background: #1a1a1a; padding: 30px; border: 1px solid var(--gold);">
-            <h2 class="sub-title"><i class="fas fa-calendar-plus"></i> Quick Booking</h2>
-            <div class="form-grid" style="grid-template-columns: 1fr;">
-                <div class="input-group">
-                    <label>Selected Date</label>
-                    <input type="text" id="quickAddDate" disabled style="background: #333; color: #aaa;">
-                </div>
-                <div class="input-group">
+                <div class="form-group">
                     <label>Client Name</label>
-                    <input type="text" id="quickClientName" placeholder="e.g. Rahul Sharma">
+                    <input type="text" id="calClientName" placeholder="Name">
                 </div>
-                <div class="input-group">
-                    <label>Event Category</label>
-                    <select id="quickEventType" style="width: 100%; padding: 12px; background: #222; color: white; border-radius: 8px; border: 1px solid #444;">
-                        <option value="Wedding">Wedding</option>
-                        <option value="Maternity">Maternity</option>
-                        <option value="Baby Shower">Baby Shower</option>
-                        <option value="Pre-Wedding">Pre-Wedding</option>
-                        <option value="Other">Other Event</option>
-                    </select>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="calEventDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Session</label>
+                        <select id="calEventSession">
+                            <option value="Morning">Morning</option>
+                            <option value="Evening">Evening</option>
+                            <option value="Full Day">Full Day</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>Assign Staff</label>
-                    <input type="text" id="quickStaff" placeholder="Lead Photographer">
-                </div>
-                <div class="input-group">
+                <div class="form-group">
                     <label>Location</label>
-                    <input type="text" id="quickLocation" placeholder="Venue Name">
+                    <input type="text" id="calEventLocation" placeholder="Venue">
                 </div>
-            </div>
-            <div class="action-row" style="background: none; padding-top: 20px;">
-                <button class="btn-save-book" onclick="saveQuickBooking()" style="width: 100%;">Save Event</button>
-                <button class="btn-close" onclick="closeQuickModal()" style="width: 100%; margin-top: 10px;">Cancel</button>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn-primary" style="flex: 1;" onclick="saveCalendarEvent()">Save Event</button>
+                    <button class="btn-primary" style="flex: 1; background: #333;" onclick="closeCalendarModal()">Cancel</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Mobile Navigation -->
-    <div class="mobile-nav no-print">
-        <div onclick="switchTab('dashboard')"><i class="fas fa-chart-line"></i><span>Dash</span></div>
-        <div onclick="switchTab('estimate')"><i class="fas fa-plus"></i><span>Estimate</span></div>
-        <div onclick="switchTab('calendar')"><i class="fas fa-calendar-alt"></i><span>Cal</span></div>
-        <div onclick="switchTab('history')"><i class="fas fa-list"></i><span>History</span></div>
+    <!-- Modal for Estimate Preview -->
+    <div id="estimateModal" class="modal-overlay no-print" style="display:none">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div id="printableEstimate" style="padding:60px; background:white; color:#1a1a1a;">
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                        <div>
+                            <h1 id="printStudioName" style="color:var(--primary-pink); font-family:'Montserrat'; font-weight:900; font-size:2.5rem;">NEEL STUDIO</h1>
+                            <p style="color:#666; font-weight:600; letter-spacing:1px;">PROFESSIONAL PHOTOGRAPHY & FILMS</p>
+                        </div>
+                        <div style="text-align:right">
+                            <h2 style="font-family:'Montserrat'; font-weight:800; color:#ddd; font-size:3rem; margin-top:-10px;">ESTIMATE</h2>
+                            <p id="printDate" style="color:#888;"></p>
+                        </div>
+                    </div>
+                    <div style="margin:40px 0; display:grid; grid-template-columns:1fr 1fr; gap:40px;">
+                        <div><p style="color:#aaa; font-size:0.8rem; font-weight:700; text-transform:uppercase; margin-bottom:5px;">Bill To</p><h3 id="printClientName" style="font-size:1.4rem;"></h3><p id="printClientPhone" style="color:#666;"></p></div>
+                        <div><p style="color:#aaa; font-size:0.8rem; font-weight:700; text-transform:uppercase; margin-bottom:5px;">Event Details</p><h3 id="printEvent" style="font-size:1.1rem;"></h3></div>
+                    </div>
+                    <table style="width:100%; border-collapse:collapse; margin-top:20px;">
+                        <thead><tr style="border-bottom:2px solid #1a1a1a;"><th style="padding:15px 0; text-align:left;">Description</th><th style="padding:15px 0; text-align:right;">Amount</th></tr></thead>
+                        <tbody id="printItemsList"></tbody>
+                        <tfoot>
+                            <tr style="border-top:1px solid #eee;"><td style="padding:15px 0;">Subtotal</td><td style="padding:15px 0; text-align:right;" id="printTotal"></td></tr>
+                            <tr><td style="padding:5px 0;">Advance Received</td><td style="padding:5px 0; text-align:right;" id="printAdvance"></td></tr>
+                            <tr style="font-weight:900; font-size:1.5rem; color:var(--primary-pink);"><td style="padding:20px 0;">Balance Due</td><td style="padding:20px 0; text-align:right;" id="printBalance"></td></tr>
+                        </tfoot>
+                    </table>
+                    <div style="margin-top:60px; padding-top:20px; border-top:1px solid #eee; font-size:0.85rem; color:#888; line-height:1.6;">
+                        <p><strong>Terms:</strong> 30% advance is non-refundable. Final payment due on the day of the event. All deliverables will be ready within 4-6 weeks.</p>
+                    </div>
+                    <!-- Work Gallery in PDF -->
+                    <div id="printPortfolio" style="margin-top:40px; border-top:1px solid #eee; padding-top:30px;">
+                        <h3 style="font-family:'Montserrat'; font-size:1.2rem; color:#333; margin-bottom:20px; text-transform:uppercase; letter-spacing:1px;">Our Recent Collection</h3>
+                        <div id="printPortfolioGrid" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:15px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" style="flex:2" onclick="confirmBooking()">Save & Book Event</button>
+                <button class="btn-primary" style="flex:1; background:#25D366; color:white;" onclick="shareEstimate()"><i class="fab fa-whatsapp"></i> Share</button>
+                <button class="btn-primary" style="flex:1; background:#333;" onclick="downloadPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+                <button class="btn-primary" style="flex:1; background:#eee; color:#666; box-shadow:none;" onclick="closeModal()">Close</button>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>

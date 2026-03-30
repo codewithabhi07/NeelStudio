@@ -3,8 +3,8 @@
   "short_name": "Neel Studio",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#d4af37",
+  "background_color": "#0F172A",
+  "theme_color": "#3B82F6",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/3249/3249935.png",

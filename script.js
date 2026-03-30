@@ -1,498 +1,577 @@
-// --- Data Persistence ---
-const DB = {
-    estimates: JSON.parse(localStorage.getItem('neel_estimates')) || [],
-    bookings: JSON.parse(localStorage.getItem('neel_bookings')) || [],
-    packages: JSON.parse(localStorage.getItem('neel_packages')) || {
-        weddingEssentials: { name: "Wedding Essentials (Haldi + Marriage)", price: 65000 },
-        maternityBaby: { name: "Maternity & Baby Shower Combo", price: 35000 },
-        grandWedding: { name: "Grand Wedding Suite", price: 150000 },
-        juniorSpecial: { name: "Junior's Special (Baby Shower + Newborn)", price: 45000 }
-    },
-    expenses: JSON.parse(localStorage.getItem('neel_expenses')) || [],
-    settings: JSON.parse(localStorage.getItem('neel_settings')) || {
-        logo: null,
-        studioName: "Neel Studio",
-        studioSub: "Cinematic Wedding Films & Photography"
-    }
+// Storage and Global State
+let estimates = JSON.parse(localStorage.getItem('estimates')) || [];
+let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+let calendarEvents = JSON.parse(localStorage.getItem('calendarEvents')) || [];
+let portfolioImages = JSON.parse(localStorage.getItem('portfolioImages')) || [];
+let packages = JSON.parse(localStorage.getItem('packages')) || [
+    { name: 'Standard Wedding', price: 45000 },
+    { name: 'Premium Wedding', price: 75000 },
+    { name: 'Maternity Pro', price: 25000 },
+    { name: 'Baby Shoot', price: 15000 }
+];
+let studioSettings = JSON.parse(localStorage.getItem('studioSettings')) || { 
+    studioName: 'Neel Studio',
+    studioPhone: '+91 9876543210',
+    studioAddress: 'Your Studio Address Here',
+    defaultTerms: '1. 30% advance is non-refundable.\n2. Final payment due on the day of the event.\n3. Deliverables within 4-6 weeks.'
 };
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let selectedPackage = null;
 
-function saveData() {
-    localStorage.setItem('neel_estimates', JSON.stringify(DB.estimates));
-    localStorage.setItem('neel_bookings', JSON.stringify(DB.bookings));
-    localStorage.setItem('neel_packages', JSON.stringify(DB.packages));
-    localStorage.setItem('neel_expenses', JSON.stringify(DB.expenses));
-    localStorage.setItem('neel_settings', JSON.stringify(DB.settings));
-    updateDashboardStats();
-}
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
+    updateDashboard();
+    renderHistory();
+    renderPackages();
+    renderCalendar();
+    renderClients();
+    renderPortfolioGrid();
+    renderExpenses();
+    document.getElementById('todayDate').innerText = new Date().toDateString();
+    initFinancialChart();
+});
 
-// --- Tab Switching ---
+// Navigation
 function switchTab(tabId) {
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+    document.getElementById(`tab-${tabId}`).style.display = 'block';
+    
     document.querySelectorAll('.nav-links li').forEach(l => l.classList.remove('active'));
-    
-    document.getElementById(`tab-${tabId}`).classList.add('active');
-    
-    const navItems = document.querySelectorAll('.nav-links li');
-    if (tabId === 'dashboard') navItems[0].classList.add('active');
-    else if (tabId === 'estimate') navItems[1].classList.add('active');
-    else if (tabId === 'calendar') navItems[2].classList.add('active');
-    else if (tabId === 'history') navItems[3].classList.add('active');
+    document.querySelectorAll('.nav-links li').forEach(item => {
+        if (item.getAttribute('onclick').includes(tabId)) item.classList.add('active');
+    });
 
+    if (window.innerWidth <= 900) toggleSidebar(false); 
+
+    if (tabId === 'dashboard') { updateDashboard(); initFinancialChart(); }
     if (tabId === 'calendar') renderCalendar();
     if (tabId === 'history') renderHistory();
-    if (tabId === 'dashboard') renderDashboard();
     if (tabId === 'clients') renderClients();
-    if (tabId === 'settings') renderSettings();
+    if (tabId === 'settings') { renderSettingsPackages(); renderPortfolioGrid(); }
 }
 
-// --- Settings & Branding ---
-function renderSettings() {
-    document.getElementById('set-studioName').value = DB.settings.studioName;
-    document.getElementById('set-studioSub').value = DB.settings.studioSub;
-    if (DB.settings.logo) {
-        document.getElementById('logoPreview').innerHTML = `<img src="${DB.settings.logo}" style="width: 100%; border-radius: 8px;">`;
-    }
-    
-    const pkgList = document.getElementById('packageEditorList');
-    pkgList.innerHTML = '';
-    Object.keys(DB.packages).forEach(key => {
-        const pkg = DB.packages[key];
-        pkgList.innerHTML += `
-            <div class="package-edit-item">
-                <div class="input-group" style="flex: 2;">
-                    <label>Package Name</label>
-                    <input type="text" value="${pkg.name}" data-key="${key}" class="pkg-name">
-                </div>
-                <div class="input-group" style="flex: 1;">
-                    <label>Price (₹)</label>
-                    <input type="number" value="${pkg.price}" class="pkg-price">
-                </div>
-            </div>
-        `;
-    });
+function toggleSidebar(force) {
+    const sidebar = document.getElementById('mainSidebar');
+    if (!sidebar) return;
+    if (force === false) sidebar.classList.remove('open');
+    else sidebar.classList.toggle('open');
 }
 
-function updateSettings() {
-    DB.settings.studioName = document.getElementById('set-studioName').value;
-    DB.settings.studioSub = document.getElementById('set-studioSub').value;
-    saveData();
-}
+// Portfolio Management
+function uploadPortfolio(input) {
+    const files = Array.from(input.files);
+    if (portfolioImages.length + files.length > 15) return alert("Maximum 15 photos allowed in portfolio.");
 
-function handleLogoUpload(input) {
-    if (input.files && input.files[0]) {
+    files.forEach(file => {
+        if (file.size > 500000) return alert(`File ${file.name} is too large (Max 500KB).`);
         const reader = new FileReader();
-        reader.onload = function(e) {
-            DB.settings.logo = e.target.result;
-            document.getElementById('logoPreview').innerHTML = `<img src="${e.target.result}" style="width: 100%; border-radius: 8px;">`;
-            saveData();
+        reader.onload = (e) => {
+            portfolioImages.push(e.target.result);
+            localStorage.setItem('portfolioImages', JSON.stringify(portfolioImages));
+            renderPortfolioGrid();
         };
-        reader.readAsDataURL(input.files[0]);
-    }
-}
-
-function savePackages() {
-    const names = document.querySelectorAll('.pkg-name');
-    const prices = document.querySelectorAll('.pkg-price');
-    names.forEach((el, i) => {
-        const key = el.getAttribute('data-key');
-        DB.packages[key] = { name: el.value, price: parseInt(prices[i].value) };
-    });
-    saveData();
-    alert("Packages updated!");
-    renderPackageChips(); // Need to implement this
-}
-
-function renderPackageChips() {
-    const container = document.querySelector('.package-chips');
-    container.innerHTML = '';
-    Object.keys(DB.packages).forEach(key => {
-        container.innerHTML += `<div class="chip" onclick="selectPackage('${key}')">${DB.packages[key].name}</div>`;
+        reader.readAsDataURL(file);
     });
 }
 
-// --- Data Safety ---
-function exportData() {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(localStorage));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "neel_studio_backup.json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
+function renderPortfolioGrid() {
+    const grid = document.getElementById('portfolio-grid');
+    if (!grid) return;
+    grid.innerHTML = portfolioImages.map((img, idx) => `
+        <div style="position:relative; aspect-ratio:1;">
+            <img src="${img}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">
+            <button style="position:absolute; top:-5px; right:-5px; background:red; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center;" onclick="deletePortfolio(${idx})">×</button>
+        </div>
+    `).join('');
 }
 
-function importData(input) {
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const importedData = JSON.parse(e.target.result);
-                Object.keys(importedData).forEach(key => {
-                    localStorage.setItem(key, importedData[key]);
-                });
-                alert("Data restored successfully! The app will reload.");
-                window.location.reload();
-            } catch (err) {
-                alert("Invalid backup file!");
+function deletePortfolio(idx) {
+    portfolioImages.splice(idx, 1);
+    localStorage.setItem('portfolioImages', JSON.stringify(portfolioImages));
+    renderPortfolioGrid();
+}
+
+// Stats & Charts
+function initFinancialChart() {
+    const canvas = document.getElementById('revenueChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (window.revenueChartInstance) window.revenueChartInstance.destroy();
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    const revenueData = [45000, 52000, 38000, 65000, 48000, 72000];
+    const expenseData = [12000, 15000, 10000, 18000, 14000, 20000];
+
+    window.revenueChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: months,
+            datasets: [
+                { label: 'Revenue', data: revenueData, backgroundColor: '#00BCD4', borderRadius: 5 },
+                { label: 'Expenses', data: expenseData, backgroundColor: '#E91E63', borderRadius: 5 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#B0A8D1' } } },
+            scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#B0A8D1' } },
+                x: { grid: { display: false }, ticks: { color: '#B0A8D1' } }
             }
-        };
-        reader.readAsText(input.files[0]);
-    }
-}
-
-// --- Clients CRM ---
-function renderClients() {
-    const list = document.getElementById('clientsList');
-    list.innerHTML = '';
-    
-    // Extract unique clients from estimates
-    const clientsMap = {};
-    DB.estimates.forEach(e => {
-        if (!clientsMap[e.clientName]) {
-            clientsMap[e.clientName] = {
-                name: e.clientName,
-                phone: e.phone || 'N/A',
-                address: e.address || 'N/A',
-                lastBooking: e.date || 'N/A'
-            };
-        } else if (e.date > clientsMap[e.clientName].lastBooking) {
-            clientsMap[e.clientName].lastBooking = e.date;
         }
     });
-
-    Object.values(clientsMap).reverse().forEach(c => {
-        list.innerHTML += `
-            <tr>
-                <td>${c.name}</td>
-                <td>${c.phone}</td>
-                <td>${c.address}</td>
-                <td>${c.lastBooking}</td>
-                <td>
-                    <button class="btn-icon" onclick="shareWA('${c.phone}')"><i class="fab fa-whatsapp"></i></button>
-                </td>
-            </tr>
-        `;
-    });
 }
 
-// --- Estimate Logic ---
-let currentEstimate = { package: null, addons: [], subtotal: 0, discount: 0, total: 0, advance: 0, balance: 0 };
+function updateDashboard() {
+    const totalRev = estimates.reduce((sum, e) => sum + e.total, 0);
+    const totalPend = estimates.reduce((sum, e) => sum + e.balance, 0);
+    const totalExp = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-function selectPackage(key) {
-    currentEstimate.package = DB.packages[key];
-    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    document.getElementById('stat-bookings').innerText = estimates.length + calendarEvents.length;
+    document.getElementById('stat-revenue').innerText = `₹${totalRev.toLocaleString('en-IN')}`;
+    document.getElementById('stat-profit').innerText = `₹${(totalRev - totalExp).toLocaleString('en-IN')}`;
+    document.getElementById('stat-pending').innerText = `₹${totalPend.toLocaleString('en-IN')}`;
+
+    renderDashboardUpcoming();
+    renderExpenses();
+}
+
+function renderDashboardUpcoming() {
+    const list = document.getElementById('dashboard-upcoming-list');
+    const allItems = [
+        ...estimates.map(e => ({ ...e, type: 'estimate' })),
+        ...calendarEvents.map(e => ({ ...e, type: 'event' }))
+    ].sort((a, b) => new Date(a.eventDate) - new Date(b.eventDate));
+
+    list.innerHTML = allItems.slice(0, 5).map(e => `
+        <div class="upcoming-item" style="border-left-color: ${e.type === 'event' ? 'var(--secondary-cyan)' : 'var(--primary-pink)'}">
+            <div>
+                <strong>${e.clientName || e.title}</strong>
+                <br><small>${e.category || e.session || ''} | ${e.eventDate || 'TBD'} ${e.location ? '| ' + e.location : ''}</small>
+            </div>
+            <div style="text-align:right">
+                ${e.type === 'estimate' ? `<span style="color:var(--primary-pink); font-weight:700">₹${e.balance.toLocaleString('en-IN')}</span><br>` : '<span style="color:var(--secondary-cyan); font-weight:700">Event</span><br>'}
+                ${e.phone ? `<button class="btn-wa" onclick="sendWhatsApp('${e.phone}', ${e.balance || 0}, '${e.clientName}')"><i class="fab fa-whatsapp"></i></button>` : ''}
+            </div>
+        </div>
+    `).join('') || '<p style="color:var(--text-muted)">No upcoming events.</p>';
+}
+
+// Expense Management
+function addExpense() {
+    const desc = document.getElementById('exp-desc').value;
+    const amt = parseFloat(document.getElementById('exp-amount').value);
+    if (desc && amt) {
+        expenses.push({ description: desc, amount: amt, date: new Date().toISOString(), id: Date.now() });
+        localStorage.setItem('expenses', JSON.stringify(expenses));
+        document.getElementById('exp-desc').value = '';
+        document.getElementById('exp-amount').value = '';
+        updateDashboard();
+    }
+}
+
+function renderExpenses() {
+    const list = document.getElementById('mini-expense-list');
+    if (!list) return;
+    list.innerHTML = expenses.slice(-5).reverse().map(ex => `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:10px 15px; border-radius:10px; margin-bottom:8px; border:1px solid var(--glass);">
+            <div><p style="margin:0; font-weight:600;">${ex.description}</p><small style="color:var(--text-muted)">₹${ex.amount.toLocaleString('en-IN')}</small></div>
+            <button style="background:none; border:none; color:#ff4444; cursor:pointer;" onclick="deleteExpense(${ex.id})"><i class="fas fa-trash"></i></button>
+        </div>
+    `).join('') || '<p style="color:var(--text-muted); font-size:0.8rem; text-align:center;">No recent expenses.</p>';
+}
+
+function deleteExpense(id) {
+    if (confirm("Delete this expense?")) {
+        expenses = expenses.filter(ex => ex.id !== id);
+        localStorage.setItem('expenses', JSON.stringify(expenses));
+        updateDashboard();
+    }
+}
+
+// Package Management
+function renderPackages() {
+    const container = document.getElementById('package-chips');
+    if (!container) return;
+    container.innerHTML = packages.map(pkg => `
+        <div class="package-chip" style="padding:10px 20px; background:var(--glass); border-radius:30px; cursor:pointer; border:1px solid var(--glass);" 
+             onclick="selectPackage(this, '${pkg.name}', ${pkg.price})">
+            ${pkg.name} (₹${pkg.price.toLocaleString('en-IN')})
+        </div>
+    `).join('');
+}
+
+function renderSettingsPackages() {
+    const list = document.getElementById('settings-package-list');
+    if (!list) return;
+    list.innerHTML = packages.map((pkg, idx) => `
+        <div class="upcoming-item" style="padding: 15px; border-left: none; background: rgba(0,0,0,0.2);">
+            <div><strong>${pkg.name}</strong><br><small>₹${pkg.price.toLocaleString('en-IN')}</small></div>
+            <button style="background:none; border:none; color:#ff4444; cursor:pointer;" onclick="deletePackage(${idx})"><i class="fas fa-times"></i></button>
+        </div>
+    `).join('');
+}
+
+function addPackage() {
+    const name = document.getElementById('newPkgName').value;
+    const price = parseFloat(document.getElementById('newPkgPrice').value);
+    if (name && price) {
+        packages.push({ name, price });
+        localStorage.setItem('packages', JSON.stringify(packages));
+        document.getElementById('newPkgName').value = '';
+        document.getElementById('newPkgPrice').value = '';
+        renderSettingsPackages();
+        renderPackages();
+    }
+}
+
+function deletePackage(idx) {
+    if (confirm("Delete this package?")) {
+        packages.splice(idx, 1);
+        localStorage.setItem('packages', JSON.stringify(packages));
+        renderSettingsPackages();
+        renderPackages();
+    }
+}
+
+function selectPackage(el, name, price) {
+    selectedPackage = { name, price };
+    document.querySelectorAll('.package-chip').forEach(c => {
+        c.style.background = 'var(--glass)';
+        c.style.borderColor = 'var(--glass)';
+    });
+    el.style.background = 'var(--aurora-gradient)';
+    el.style.borderColor = 'var(--primary-pink)';
     updateTotal();
 }
 
 function updateTotal() {
-    if (!currentEstimate.package) return;
-    let subtotal = currentEstimate.package.price;
-    currentEstimate.addons = [];
-    document.querySelectorAll('.addon-grid-lite input:checked').forEach(cb => {
-        const val = parseInt(cb.value);
-        subtotal += val;
-        currentEstimate.addons.push({ name: cb.getAttribute('data-name'), price: val });
-    });
-    const discount = parseInt(document.getElementById('discountInput').value) || 0;
-    const advance = parseInt(document.getElementById('advanceInput').value) || 0;
-    currentEstimate.subtotal = subtotal;
-    currentEstimate.discount = discount;
-    currentEstimate.total = subtotal - discount;
-    currentEstimate.advance = advance;
-    currentEstimate.balance = currentEstimate.total - advance;
-    document.getElementById('totalDisplay').innerText = `₹${currentEstimate.total.toLocaleString('en-IN')}`;
-    document.getElementById('balanceDisplay').innerText = `₹${currentEstimate.balance.toLocaleString('en-IN')}`;
+    let base = selectedPackage ? selectedPackage.price : 0;
+    let addonsTotal = 0;
+    document.querySelectorAll('.addon-check:checked').forEach(cb => addonsTotal += parseFloat(cb.value));
+    
+    const travel = parseFloat(document.getElementById('travelCharge').value || 0);
+    const other = parseFloat(document.getElementById('otherCharge').value || 0);
+    const disc = parseFloat(document.getElementById('discountInput').value || 0);
+    const adv = parseFloat(document.getElementById('advanceInput').value || 0);
+    
+    const finalTotal = (base + addonsTotal + travel + other) - disc;
+    const balance = finalTotal - adv;
+    
+    document.getElementById('totalDisplay').innerText = `₹${finalTotal.toLocaleString('en-IN')}`;
+    document.getElementById('balanceDisplay').innerText = `₹${balance.toLocaleString('en-IN')}`;
 }
 
-function checkAvailability() {
-    const date = document.getElementById('eventDate').value;
-    const badge = document.getElementById('avail-badge');
-    const isBooked = DB.bookings.some(b => b.date === date);
-    badge.innerText = isBooked ? "ALREADY BOOKED" : "AVAILABLE";
-    badge.style.background = isBooked ? "#e74c3c" : "#2ecc71";
-}
-
-function generateEstimate() {
+// Modal & Preview
+function showPreview() {
     const name = document.getElementById('clientName').value;
-    const phone = document.getElementById('clientPhone').value;
-    if (!name || !currentEstimate.package) { alert("Enter client name and select package!"); return; }
+    if (!name || !selectedPackage) return alert("Enter client name and select a package!");
     
-    // Branding
-    const brandContainer = document.querySelector('.studio-branding');
-    brandContainer.innerHTML = `
-        ${DB.settings.logo ? `<img src="${DB.settings.logo}" style="width: 80px; margin-bottom: 10px;">` : '<i class="fas fa-camera-retro"></i>'}
-        <h2>${DB.settings.studioName}</h2>
-        <p>${DB.settings.studioSub}</p>
-    `;
+    document.getElementById('printClientName').innerText = name;
+    document.getElementById('printClientPhone').innerText = document.getElementById('clientPhone').value;
+    document.getElementById('printEvent').innerText = `${document.getElementById('eventCategory').value} on ${document.getElementById('eventDate').value} (${document.getElementById('eventSession').value})`;
+    document.getElementById('printDate').innerText = new Date().toLocaleDateString();
+    document.getElementById('printStudioName').innerText = studioSettings.studioName;
 
-    document.getElementById('billNumber').innerText = `#NS-${Date.now().toString().slice(-6)}`;
-    document.getElementById('printClientName').innerText = name + (phone ? ` (${phone})` : '');
-    document.getElementById('printLocation').innerText = document.getElementById('location').value || "Not Set";
-    document.getElementById('printDate').innerText = document.getElementById('eventDate').value || "TBD";
-    document.getElementById('issueDate').innerText = new Date().toLocaleDateString();
+    let itemsHtml = `<tr><td style="padding:10px;">${selectedPackage.name}</td><td style="padding:10px; text-align:right;">₹${selectedPackage.price.toLocaleString('en-IN')}</td></tr>`;
     
-    const list = document.getElementById('printItemsList');
-    list.innerHTML = `<tr><td>${currentEstimate.package.name}</td><td class="text-right">₹${currentEstimate.package.price.toLocaleString('en-IN')}</td></tr>`;
-    currentEstimate.addons.forEach(a => { list.innerHTML += `<tr><td>${a.name}</td><td class="text-right">₹${a.price.toLocaleString('en-IN')}</td></tr>`; });
+    const travel = parseFloat(document.getElementById('travelCharge').value || 0);
+    if (travel > 0) itemsHtml += `<tr><td style="padding:10px;">Travel / Conveyance</td><td style="padding:10px; text-align:right;">₹${travel.toLocaleString('en-IN')}</td></tr>`;
     
-    document.getElementById('printSubtotal').innerText = `₹${currentEstimate.subtotal.toLocaleString('en-IN')}`;
-    document.getElementById('printDiscount').innerText = `- ₹${currentEstimate.discount.toLocaleString('en-IN')}`;
-    document.getElementById('printGrandTotal').innerText = `₹${currentEstimate.total.toLocaleString('en-IN')}`;
-    document.getElementById('printAdvance').innerText = `₹${currentEstimate.advance.toLocaleString('en-IN')}`;
-    document.getElementById('printBalance').innerText = `₹${currentEstimate.balance.toLocaleString('en-IN')}`;
+    const other = parseFloat(document.getElementById('otherCharge').value || 0);
+    if (other > 0) itemsHtml += `<tr><td style="padding:10px;">Other Expenses</td><td style="padding:10px; text-align:right;">₹${other.toLocaleString('en-IN')}</td></tr>`;
+
+    document.querySelectorAll('.addon-check:checked').forEach(cb => {
+        itemsHtml += `<tr><td style="padding:10px;">${cb.getAttribute('data-name')}</td><td style="padding:10px; text-align:right;">₹${parseFloat(cb.value).toLocaleString('en-IN')}</td></tr>`;
+    });
+    
+    document.getElementById('printItemsList').innerHTML = itemsHtml;
+    document.getElementById('printTotal').innerText = document.getElementById('totalDisplay').innerText;
+    document.getElementById('printAdvance').innerText = `₹${parseFloat(document.getElementById('advanceInput').value || 0).toLocaleString('en-IN')}`;
+    document.getElementById('printBalance').innerText = document.getElementById('balanceDisplay').innerText;
+    
+    // Render Portfolio Gallery in Preview
+    const printGrid = document.getElementById('printPortfolioGrid');
+    printGrid.innerHTML = portfolioImages.map(img => `
+        <img src="${img}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:5px;">
+    `).join('');
+    document.getElementById('printPortfolio').style.display = portfolioImages.length > 0 ? 'block' : 'none';
+
     document.getElementById('estimateModal').style.display = 'flex';
+}
+
+function shareEstimate() {
+    const element = document.getElementById('printableEstimate');
+    html2pdf().from(element).toPdf().get('pdf').then(function (pdf) {
+        const pdfBlob = pdf.output('blob');
+        const pdfFile = new File([pdfBlob], `Estimate_${document.getElementById('clientName').value}.pdf`, { type: 'application/pdf' });
+        
+        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+            navigator.share({
+                files: [pdfFile],
+                title: 'Project Estimate',
+                text: `Estimate from ${studioSettings.studioName} for ${document.getElementById('clientName').value}`
+            }).catch(console.error);
+        } else {
+            sendWhatsApp(document.getElementById('clientPhone').value, 0, document.getElementById('clientName').value);
+        }
+    });
 }
 
 function confirmBooking() {
     const name = document.getElementById('clientName').value;
-    const phone = document.getElementById('clientPhone').value;
-    const date = document.getElementById('eventDate').value;
-    const endDate = document.getElementById('eventEndDate').value;
-    const category = document.getElementById('eventCategory').value;
-    const staff = document.getElementById('assignStaff').value;
-    const loc = document.getElementById('location').value;
+    const travel = parseFloat(document.getElementById('travelCharge').value || 0);
+    const other = parseFloat(document.getElementById('otherCharge').value || 0);
+    const disc = parseFloat(document.getElementById('discountInput').value || 0);
+    const adv = parseFloat(document.getElementById('advanceInput').value || 0);
+    let addonsTotal = 0;
+    document.querySelectorAll('.addon-check:checked').forEach(cb => addonsTotal += parseFloat(cb.value));
+    const total = (selectedPackage ? selectedPackage.price : 0) + addonsTotal + travel + other - disc;
 
-    const newEst = { 
-        id: Date.now(), 
-        clientName: name, 
-        phone: phone, 
-        date: date, 
-        endDate: endDate,
-        package: currentEstimate.package.name, 
-        total: currentEstimate.total, 
-        balance: currentEstimate.balance,
-        status: 'Pending',
-        staff: staff,
-        category: category
+    const newEst = {
+        clientName: name, phone: document.getElementById('clientPhone').value, eventDate: document.getElementById('eventDate').value,
+        packageName: selectedPackage ? selectedPackage.name : 'Custom', total: total, balance: total - adv, category: document.getElementById('eventCategory').value,
+        session: document.getElementById('eventSession').value, location: document.getElementById('location').value,
+        notes: document.getElementById('estimateNotes').value, travel: travel, other: other, status: 'Pending', timestamp: Date.now()
     };
+
+    estimates.push(newEst);
+    localStorage.setItem('estimates', JSON.stringify(estimates));
     
-    DB.estimates.push(newEst);
-    if (date) {
-        // Block all dates from date to endDate
-        let current = new Date(date);
-        const last = endDate ? new Date(endDate) : new Date(date);
-        
-        while (current <= last) {
-            const dStr = current.toISOString().split('T')[0];
-            DB.bookings.push({ 
-                date: dStr, 
-                name: `${name} (${category})`, 
-                loc, 
-                estimateId: newEst.id,
-                category: category,
-                staff: staff
-            });
-            current.setDate(current.getDate() + 1);
-        }
-    }
-    saveData();
+    // Reset Form
+    document.getElementById('clientName').value = '';
+    document.getElementById('clientPhone').value = '';
+    document.getElementById('eventDate').value = '';
+    document.getElementById('location').value = '';
+    document.getElementById('travelCharge').value = '0';
+    document.getElementById('otherCharge').value = '0';
+    document.getElementById('discountInput').value = '0';
+    document.getElementById('advanceInput').value = '0';
+    document.getElementById('estimateNotes').value = '';
+    document.querySelectorAll('.addon-check').forEach(cb => cb.checked = false);
+    selectedPackage = null;
+    updateTotal();
+
     closeModal();
-    switchTab('dashboard');
-}
-
-// --- Calendar Logic ---
-let viewDate = new Date();
-
-function renderCalendar() {
-    const grid = document.getElementById('calendarGrid');
-    const header = document.getElementById('calMonthYear');
-    grid.innerHTML = '';
-    const year = viewDate.getFullYear();
-    const month = viewDate.getMonth();
-    header.innerText = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(viewDate);
-    ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(d => grid.innerHTML += `<div class="cal-day header">${d}</div>`);
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div class="cal-day"></div>`;
-    for (let d = 1; d <= daysInMonth; d++) {
-        const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const booking = DB.bookings.find(b => b.date === dStr);
-        let colorStyle = '';
-        if (booking) {
-            const color = getCategoryColor(booking.category);
-            colorStyle = `background: ${color}; color: white; border: none;`;
-        }
-        grid.innerHTML += `
-            <div class="cal-day ${booking ? 'booked' : ''}" style="cursor: pointer; ${colorStyle}" onclick="handleDayClick('${dStr}')">
-                ${d}
-                ${booking ? `<br><small>${booking.name.split(' ')[0]}</small>` : ''}
-            </div>
-        `;
-    }
-}
-
-function getCategoryColor(cat) {
-    switch(cat) {
-        case 'Wedding': return '#e74c3c';
-        case 'Maternity': return '#e91e63';
-        case 'Baby Shower': return '#9b59b6';
-        case 'Pre-Wedding': return '#f39c12';
-        default: return 'var(--gold)';
-    }
-}
-
-function handleDayClick(date) {
-    const booking = DB.bookings.find(b => b.date === date);
-    if (booking) {
-        if (confirm(`Date: ${date}\nClient: ${booking.name}\nLocation: ${booking.loc}\n\nDelete this booking?`)) {
-            DB.bookings = DB.bookings.filter(b => b.date !== date);
-            saveData();
-            renderCalendar();
-        }
-    } else {
-        document.getElementById('quickAddDate').value = date;
-        document.getElementById('quickAddModal').style.display = 'flex';
-    }
-}
-
-function saveQuickBooking() {
-    const date = document.getElementById('quickAddDate').value;
-    const name = document.getElementById('quickClientName').value;
-    const type = document.getElementById('quickEventType').value;
-    const staff = document.getElementById('quickStaff').value;
-    const loc = document.getElementById('quickLocation').value;
-    if (!name) { alert("Enter client name!"); return; }
-    DB.bookings.push({ 
-        date, 
-        name: `${name} (${type})`, 
-        loc, 
-        category: type,
-        staff: staff,
-        estimateId: null 
-    });
-    saveData();
-    closeQuickModal();
     renderCalendar();
+    switchTab('history');
+    updateDashboard();
 }
 
-function changeMonth(dir) { viewDate.setMonth(viewDate.getMonth() + dir); renderCalendar(); }
-function closeQuickModal() { 
-    document.getElementById('quickAddModal').style.display = 'none'; 
-    document.getElementById('quickClientName').value = '';
-    document.getElementById('quickLocation').value = '';
-    document.getElementById('quickStaff').value = '';
-}
-
-// --- History & Dashboard ---
-function renderHistory() {
-    const list = document.getElementById('historyList');
-    const search = document.getElementById('historySearch').value.toLowerCase();
-    list.innerHTML = '';
-    DB.estimates.filter(e => e.clientName.toLowerCase().includes(search)).reverse().forEach(e => {
-        list.innerHTML += `
-            <tr>
-                <td>${e.date || 'N/A'}</td>
-                <td>
-                    <strong>${e.clientName}</strong><br>
-                    <small class="text-muted">${e.staff || 'No Staff'}</small>
-                </td>
-                <td>
-                    ${e.package}<br>
-                    <span class="badge" style="background: ${getStatusColor(e.status)}">${e.status || 'Pending'}</span>
-                </td>
-                <td>₹${e.total.toLocaleString('en-IN')}</td>
-                <td class="gold">₹${e.balance.toLocaleString('en-IN')}</td>
-                <td>
-                    <button class="btn-icon" onclick="updatePayment(${e.id})" title="Update Payment"><i class="fas fa-edit"></i></button>
-                    <button class="btn-icon" onclick="changeStatus(${e.id})" title="Change Status"><i class="fas fa-tasks"></i></button>
-                    <button class="btn-icon" onclick="deleteEstimate(${e.id})"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
-    });
-}
-
-function getStatusColor(status) {
-    switch(status) {
-        case 'Shooting': return '#3498db';
-        case 'Editing': return '#f1c40f';
-        case 'Delivered': return '#2ecc71';
-        default: return '#e74c3c';
-    }
-}
-
-function updatePayment(id) {
-    const est = DB.estimates.find(e => e.id === id);
-    const paid = prompt(`Current Balance: ₹${est.balance}\nEnter amount received:`, "0");
-    if (paid && !isNaN(paid)) {
-        est.balance -= parseInt(paid);
-        saveData();
-        renderHistory();
-    }
-}
-
-function changeStatus(id) {
-    const est = DB.estimates.find(e => e.id === id);
-    const newStatus = prompt(`Current Status: ${est.status}\nEnter new status (Shooting, Editing, Delivered):`, est.status);
-    if (newStatus) {
-        est.status = newStatus;
-        saveData();
-        renderHistory();
-    }
-}
-
-function deleteEstimate(id) {
-    if (confirm("Delete this record?")) {
-        DB.estimates = DB.estimates.filter(e => e.id !== id);
-        DB.bookings = DB.bookings.filter(b => b.estimateId !== id);
-        saveData();
-        renderHistory();
-    }
-}
-
-function renderDashboard() {
-    document.getElementById('todayDate').innerText = new Date().toDateString();
-    const upcomingList = document.getElementById('dashboard-upcoming-list');
-    upcomingList.innerHTML = '';
-    const today = new Date().toISOString().split('T')[0];
-    const upcoming = DB.bookings.filter(b => b.date >= today).sort((a,b) => a.date.localeCompare(b.date));
-    if (upcoming.length === 0) upcomingList.innerHTML = "<p class='text-muted'>No upcoming events.</p>";
-    upcoming.slice(0, 5).forEach(b => {
-        upcomingList.innerHTML += `<div class="upcoming-item"><div><strong>${b.name}</strong><br><small class="text-muted">${b.loc || 'No location'}</small></div><div class="text-right"><span class="gold">${b.date}</span></div></div>`;
-    });
-}
-
-function updateDashboardStats() {
-    const totalRev = DB.estimates.reduce((sum, e) => sum + e.total, 0);
-    const totalPen = DB.estimates.reduce((sum, e) => sum + e.balance, 0);
-    const totalExp = DB.expenses.reduce((sum, e) => sum + e.amount, 0);
-    
-    document.getElementById('stat-bookings').innerText = DB.bookings.length;
-    document.getElementById('stat-revenue').innerText = `₹${totalRev.toLocaleString('en-IN')}`;
-    document.getElementById('stat-pending').innerText = `₹${totalPen.toLocaleString('en-IN')}`;
-    document.getElementById('stat-profit').innerText = `₹${(totalRev - totalExp).toLocaleString('en-IN')}`;
-    
-    // Mini expense list
-    const miniExp = document.getElementById('mini-expense-list');
-    if (miniExp) {
-        miniExp.innerHTML = '<strong>Recent Expenses:</strong><br>';
-        DB.expenses.slice(-3).reverse().forEach(e => {
-            miniExp.innerHTML += `<div>${e.desc}: <span class="gold">₹${e.amount}</span></div>`;
-        });
-    }
-}
-
-function addExpense() {
-    const desc = document.getElementById('exp-desc').value;
-    const amount = parseInt(document.getElementById('exp-amount').value);
-    if (!desc || !amount) return;
-    DB.expenses.push({ desc, amount, date: new Date().toISOString() });
-    saveData();
-    document.getElementById('exp-desc').value = '';
-    document.getElementById('exp-amount').value = '';
+function downloadPDF() {
+    const element = document.getElementById('printableEstimate');
+    const opt = { margin: 0, filename: `Estimate_${document.getElementById('printClientName').innerText}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+    html2pdf().set(opt).from(element).save();
 }
 
 function closeModal() { document.getElementById('estimateModal').style.display = 'none'; }
-function downloadPDF() { const el = document.getElementById('printableEstimate'); html2pdf().from(el).save(`Neel_Studio_Bill.pdf`); }
-function shareWA() { window.open(`https://wa.me/?text=Estimate from Neel Studio`, '_blank'); }
 
-window.onload = () => { 
-    updateDashboardStats(); 
-    renderDashboard(); 
-    renderPackageChips(); 
+// History & Clients
+function renderHistory() {
+    const search = document.getElementById('historySearch').value.toLowerCase();
+    document.getElementById('historyList').innerHTML = estimates
+        .filter(e => e.clientName.toLowerCase().includes(search))
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .map((e) => `
+            <tr>
+                <td>${e.eventDate || 'TBD'}</td>
+                <td><strong>${e.clientName}</strong></td>
+                <td>${e.packageName}</td>
+                <td>₹${e.total.toLocaleString('en-IN')}</td>
+                <td style="color:var(--primary-pink); font-weight:bold;">₹${e.balance.toLocaleString('en-IN')}</td>
+                <td>
+                    <button class="btn-wa" onclick="sendWhatsApp('${e.phone}', ${e.balance}, '${e.clientName}')"><i class="fab fa-whatsapp"></i></button>
+                    <button style="background:none; border:none; color:white; cursor:pointer;" onclick="deleteEstimate(${e.timestamp})"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `).join('') || '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No history found.</td></tr>';
+}
 
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('service-worker.js');
+function deleteEstimate(timestamp) {
+    if (confirm("Delete this estimate?")) {
+        estimates = estimates.filter(e => e.timestamp !== timestamp);
+        localStorage.setItem('estimates', JSON.stringify(estimates));
+        renderHistory();
+        renderCalendar();
+        updateDashboard();
     }
-};
+}
+
+function renderClients() {
+    const clients = [...new Set(estimates.map(e => JSON.stringify({name: e.clientName, phone: e.phone})))].map(s => JSON.parse(s));
+    document.getElementById('clientsList').innerHTML = clients.map(c => `
+        <tr><td><strong>${c.name}</strong></td><td>${c.phone}</td><td><button class="btn-wa" onclick="sendWhatsApp('${c.phone}', 0, '${c.name}')"><i class="fab fa-whatsapp"></i> Chat</button></td></tr>
+    `).join('') || '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No clients found.</td></tr>';
+}
+
+// Backup & Settings
+function loadSettings() {
+    document.getElementById('set-studioName').value = studioSettings.studioName;
+    document.getElementById('set-studioPhone').value = studioSettings.studioPhone || '';
+    document.getElementById('set-studioAddress').value = studioSettings.studioAddress || '';
+    document.getElementById('set-defaultTerms').value = studioSettings.defaultTerms || '';
+}
+
+function saveSettings() {
+    studioSettings.studioName = document.getElementById('set-studioName').value;
+    studioSettings.studioPhone = document.getElementById('set-studioPhone').value;
+    studioSettings.studioAddress = document.getElementById('set-studioAddress').value;
+    studioSettings.defaultTerms = document.getElementById('set-defaultTerms').value;
+    localStorage.setItem('studioSettings', JSON.stringify(studioSettings));
+}
+
+function exportData() {
+    const data = { estimates, expenses, packages, studioSettings, calendarEvents, portfolioImages };
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'neel_studio_pro_backup.json'; a.click();
+}
+
+function importData(input) {
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const data = JSON.parse(e.target.result);
+        estimates = data.estimates || []; expenses = data.expenses || []; packages = data.packages || packages;
+        calendarEvents = data.calendarEvents || []; studioSettings = data.studioSettings || studioSettings;
+        portfolioImages = data.portfolioImages || [];
+        localStorage.setItem('estimates', JSON.stringify(estimates)); localStorage.setItem('expenses', JSON.stringify(expenses));
+        localStorage.setItem('calendarEvents', JSON.stringify(calendarEvents)); localStorage.setItem('studioSettings', JSON.stringify(studioSettings));
+        localStorage.setItem('portfolioImages', JSON.stringify(portfolioImages));
+        location.reload();
+    };
+    reader.readAsText(file);
+}
+
+function sendWhatsApp(phone, balance, name) {
+    const message = balance > 0 ? `Hi ${name}, reminder from ${studioSettings.studioName} regarding balance ₹${balance}.` : `Hi ${name}, from ${studioSettings.studioName}!`;
+    const cleanPhone = phone.replace(/\D/g, '').length === 10 ? `91${phone.replace(/\D/g, '')}` : phone.replace(/\D/g, '');
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+}
+
+// Calendar Implementation
+function renderCalendar() {
+    renderMonthlySchedule();
+    const container = document.getElementById('calendar-container');
+    if (!container) return;
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    
+    let calendarHtml = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; flex-wrap:wrap; gap:15px;">
+            <div style="display:flex; align-items:center; gap:15px;">
+                <button onclick="changeMonth(-1)" class="btn-primary" style="padding:10px 15px; background:var(--glass);"><i class="fas fa-chevron-left"></i></button>
+                <h2 style="color:var(--secondary-cyan); margin-bottom:0; min-width:150px; text-align:center; font-size:1.2rem;">${monthNames[currentMonth]} ${currentYear}</h2>
+                <button onclick="changeMonth(1)" class="btn-primary" style="padding:10px 15px; background:var(--glass);"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <button class="btn-primary" onclick="openCalendarModal()"><i class="fas fa-plus"></i> Add Event</button>
+        </div>
+        <div class="cal-grid">
+            ${weekDays.map(d => `<div style="text-align:center; color:var(--text-muted); font-weight:700; font-size:0.75rem; text-transform:uppercase; padding-bottom:10px;">${d}</div>`).join('')}
+    `;
+
+    for (let i = 0; i < firstDay; i++) calendarHtml += '<div class="cal-day-empty"></div>';
+    
+    for (let i = 1; i <= daysInMonth; i++) {
+        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        const dayItems = [
+            ...estimates.filter(e => e.eventDate === dateStr).map(e => ({...e, type: 'estimate'})),
+            ...calendarEvents.filter(e => e.eventDate === dateStr).map(e => ({...e, type: 'event'}))
+        ];
+        dayItems.sort((a, b) => {
+            const sessions = { 'Morning': 1, 'Evening': 2, 'Full Day': 3 };
+            return (sessions[a.session] || 99) - (sessions[b.session] || 99);
+        });
+
+        calendarHtml += `
+            <div class="cal-day ${dayItems.length > 0 ? 'has-event' : ''}" onclick="openCalendarModal('${dateStr}')">
+                <span style="font-weight:700; opacity:0.5; font-size:0.8rem;">${i}</span>
+                <div style="margin-top:5px; display:flex; flex-direction:column; gap:4px; width:100%;">
+                    ${dayItems.map(item => `
+                        <div class="cal-event-pill ${item.type === 'estimate' ? 'pill-estimate' : 'pill-event'}">
+                            ${item.session ? `[${item.session[0]}] ` : ''}${item.clientName || item.title}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    calendarHtml += `</div>`;
+    container.innerHTML = calendarHtml;
+}
+
+function renderMonthlySchedule() {
+    const list = document.getElementById('manualEventsList');
+    if (!list) return;
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+    
+    const monthlyItems = [
+        ...estimates.filter(e => e.eventDate && e.eventDate.startsWith(monthStr)).map(e => ({...e, type: 'estimate'})),
+        ...calendarEvents.filter(e => e.eventDate && e.eventDate.startsWith(monthStr)).map(e => ({...e, type: 'event'}))
+    ];
+
+    monthlyItems.sort((a, b) => {
+        if (a.eventDate !== b.eventDate) return new Date(a.eventDate) - new Date(b.eventDate);
+        const sessions = { 'Morning': 1, 'Evening': 2, 'Full Day': 3 };
+        return (sessions[a.session] || 99) - (sessions[b.session] || 99);
+    });
+
+    list.innerHTML = monthlyItems.map((e) => {
+        const isManual = e.type === 'event';
+        return `
+            <tr style="border-left: 4px solid ${isManual ? 'var(--secondary-cyan)' : 'var(--primary-pink)'}">
+                <td>${e.eventDate}</td>
+                <td><strong>${isManual ? e.title : e.packageName}</strong></td>
+                <td>${e.clientName || '-'}</td>
+                <td><span class="cal-event-pill ${isManual ? 'pill-event' : 'pill-estimate'}" style="display:inline-block; width:auto; padding:2px 10px;">${e.session || 'Full Day'}</span></td>
+                <td style="text-align:center;">
+                    ${isManual ? 
+                        `<button style="background:none; border:none; color:white; cursor:pointer;" onclick="deleteCalendarEvent(${e.id})"><i class="fas fa-trash"></i></button>` : 
+                        `<i class="fas fa-check-circle" style="color:var(--primary-pink)" title="Confirmed Booking"></i>`
+                    }
+                </td>
+            </tr>
+        `;
+    }).join('') || `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No bookings for ${monthNames[currentMonth]} ${currentYear}.</td></tr>`;
+}
+
+function deleteCalendarEvent(id) {
+    if (confirm("Delete this event?")) {
+        calendarEvents = calendarEvents.filter(e => e.id !== id);
+        localStorage.setItem('calendarEvents', JSON.stringify(calendarEvents));
+        renderCalendar();
+        updateDashboard();
+    }
+}
+
+function openCalendarModal(date = '') { 
+    document.getElementById('calEventDate').value = date || new Date().toISOString().split('T')[0]; 
+    document.getElementById('calEventTitle').value = ''; 
+    document.getElementById('calClientName').value = ''; 
+    document.getElementById('calEventLocation').value = ''; 
+    document.getElementById('calendarModal').style.display = 'flex'; 
+}
+
+function closeCalendarModal() { document.getElementById('calendarModal').style.display = 'none'; }
+
+function saveCalendarEvent() {
+    const title = document.getElementById('calEventTitle').value, client = document.getElementById('calClientName').value, date = document.getElementById('calEventDate').value, session = document.getElementById('calEventSession').value, location = document.getElementById('calEventLocation').value;
+    if (!title || !date) return alert("Title and Date are required!");
+    calendarEvents.push({ title, clientName: client, eventDate: date, session, location, id: Date.now() });
+    localStorage.setItem('calendarEvents', JSON.stringify(calendarEvents));
+    closeCalendarModal(); renderCalendar(); updateDashboard();
+}
+
+function changeMonth(d) { 
+    currentMonth += d; 
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; } 
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; } 
+    renderCalendar(); 
+}
