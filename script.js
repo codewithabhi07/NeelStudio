@@ -54,9 +54,15 @@ function switchTab(tabId) {
 
 function toggleSidebar(force) {
     const sidebar = document.getElementById('mainSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
     if (!sidebar) return;
-    if (force === false) sidebar.classList.remove('open');
-    else sidebar.classList.toggle('open');
+    if (force === false) {
+        sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('open');
+    } else {
+        sidebar.classList.toggle('open');
+        if (overlay) overlay.classList.toggle('open');
+    }
 }
 
 // Portfolio Management
@@ -377,12 +383,12 @@ function renderHistory() {
         .sort((a, b) => b.timestamp - a.timestamp)
         .map((e) => `
             <tr>
-                <td>${e.eventDate || 'TBD'}</td>
-                <td><strong>${e.clientName}</strong></td>
-                <td>${e.packageName}</td>
-                <td>₹${e.total.toLocaleString('en-IN')}</td>
-                <td style="color:var(--primary-pink); font-weight:bold;">₹${e.balance.toLocaleString('en-IN')}</td>
-                <td>
+                <td data-label="Date">${e.eventDate || 'TBD'}</td>
+                <td data-label="Client"><strong>${e.clientName}</strong></td>
+                <td data-label="Package">${e.packageName}</td>
+                <td data-label="Total">₹${e.total.toLocaleString('en-IN')}</td>
+                <td data-label="Balance" style="color:var(--primary-pink); font-weight:bold;">₹${e.balance.toLocaleString('en-IN')}</td>
+                <td data-label="Actions">
                     <button class="btn-wa" onclick="sendWhatsApp('${e.phone}', ${e.balance}, '${e.clientName}')"><i class="fab fa-whatsapp"></i></button>
                     <button style="background:none; border:none; color:white; cursor:pointer;" onclick="deleteEstimate(${e.timestamp})"><i class="fas fa-trash"></i></button>
                 </td>
@@ -403,7 +409,7 @@ function deleteEstimate(timestamp) {
 function renderClients() {
     const clients = [...new Set(estimates.map(e => JSON.stringify({name: e.clientName, phone: e.phone})))].map(s => JSON.parse(s));
     document.getElementById('clientsList').innerHTML = clients.map(c => `
-        <tr><td><strong>${c.name}</strong></td><td>${c.phone}</td><td><button class="btn-wa" onclick="sendWhatsApp('${c.phone}', 0, '${c.name}')"><i class="fab fa-whatsapp"></i> Chat</button></td></tr>
+        <tr><td data-label="Name"><strong>${c.name}</strong></td><td data-label="Phone">${c.phone}</td><td data-label="Actions"><button class="btn-wa" onclick="sendWhatsApp('${c.phone}', 0, '${c.name}')"><i class="fab fa-whatsapp"></i> Chat</button></td></tr>
     `).join('') || '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No clients found.</td></tr>';
 }
 
@@ -527,11 +533,11 @@ function renderMonthlySchedule() {
         const isManual = e.type === 'event';
         return `
             <tr style="border-left: 4px solid ${isManual ? 'var(--secondary-cyan)' : 'var(--primary-pink)'}">
-                <td>${e.eventDate}</td>
-                <td><strong>${isManual ? e.title : e.packageName}</strong></td>
-                <td>${e.clientName || '-'}</td>
-                <td><span class="cal-event-pill ${isManual ? 'pill-event' : 'pill-estimate'}" style="display:inline-block; width:auto; padding:2px 10px;">${e.session || 'Full Day'}</span></td>
-                <td style="text-align:center;">
+                <td data-label="Date">${e.eventDate}</td>
+                <td data-label="Description"><strong>${isManual ? e.title : e.packageName}</strong></td>
+                <td data-label="Client">${e.clientName || '-'}</td>
+                <td data-label="Session"><span class="cal-event-pill ${isManual ? 'pill-event' : 'pill-estimate'}" style="display:inline-block; width:auto; padding:2px 10px;">${e.session || 'Full Day'}</span></td>
+                <td data-label="Status" style="text-align:center;">
                     ${isManual ? 
                         `<button style="background:none; border:none; color:white; cursor:pointer;" onclick="deleteCalendarEvent(${e.id})"><i class="fas fa-trash"></i></button>` : 
                         `<i class="fas fa-check-circle" style="color:var(--primary-pink)" title="Confirmed Booking"></i>`
